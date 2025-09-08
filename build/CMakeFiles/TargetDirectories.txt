@@ -1,0 +1,5 @@
+C:/Users/tobyj/local_git/ybottom/SpikingGraph/SpikingGraph/build/CMakeFiles/spikinggraph.dir
+C:/Users/tobyj/local_git/ybottom/SpikingGraph/SpikingGraph/build/CMakeFiles/run_example.dir
+C:/Users/tobyj/local_git/ybottom/SpikingGraph/SpikingGraph/build/CMakeFiles/INSTALL.dir
+C:/Users/tobyj/local_git/ybottom/SpikingGraph/SpikingGraph/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/tobyj/local_git/ybottom/SpikingGraph/SpikingGraph/build/CMakeFiles/ZERO_CHECK.dir

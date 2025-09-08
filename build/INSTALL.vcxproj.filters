@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\tobyj\local_git\ybottom\SpikingGraph\SpikingGraph\build\CMakeFiles\a067694798142a9492044192fcb2ec51\INSTALL_force.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{28B77702-165F-3645-9030-195E395D43D0}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
