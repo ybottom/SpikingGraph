@@ -1,3 +1,32 @@
+# SpikingGraph
+
+SpikingGraph is a high-performance, event-driven spiking neural network (SNN) simulation engine with multi-backend support (CPU, GPU, NPU) and language bindings for Python, Rust, C#, and Java.
+
+## Project Structure
+
+- `src/`         — Core C++ source code and API
+- `rust_core/`   — Rust cdylib backend
+- `include/`     — C/C++ public headers
+- `examples/`    — Example programs
+- `docs/`        — Documentation and guides
+- `tests/`       — Unit and integration tests
+- `scripts/`     — Build and utility scripts
+- `.github/`     — GitHub workflows and issue templates
+- `build/`       — Build artifacts (ignored in VCS)
+
+## Documentation
+
+See `docs/README.md` for architecture, roadmap, and contribution guidelines.
+
+## Getting Started
+
+1. Clone the repository
+2. Build the core library using CMake or Cargo (for Rust)
+3. Run examples from the `examples/` directory
+
+## Contributing
+
+See `CONTRIBUTING.md` for guidelines.
 A general-purpose **S**piking **N**eural **N**etwork library, with the latest training and inference techniques and optimisations. 
 
 # Goals

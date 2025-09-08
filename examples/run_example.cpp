@@ -9,6 +9,8 @@ int main() {
     SNNConfig cfg;
     cfg.num_neurons = 10;
     cfg.dt = 0.001;
+    // Select neuron model: 0 = LIF, 1 = Izhikevich
+    cfg.neuron_model = 1; // Try 0 for LIF, 1 for Izhikevich
 
     SNNHandle h = snn_create_network(&cfg);
     snn_register_spike_callback(h, my_spike_callback, nullptr);

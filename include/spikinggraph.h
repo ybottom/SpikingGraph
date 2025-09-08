@@ -1,3 +1,42 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// STDP learning rule API
+typedef struct STDPParams {
+  float A_plus;
+  float A_minus;
+  float tau_plus;
+  float tau_minus;
+} STDPParams;
+
+typedef struct STDPTraces {
+  float* pre_trace;
+  float* post_trace;
+} STDPTraces;
+
+SPKG_API void spkg_stdp_update(
+  int pre, int post,
+  float* weight,
+  STDPTraces* traces,
+  const STDPParams* params,
+  int pre_spike, int post_spike, float dt);
+
+#ifdef __cplusplus
+}
+#endif
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// Spike encoding API
+SPKG_API int spkg_encode_rate(const float* data, int length, int num_steps, float* out_spikes);
+SPKG_API int spkg_encode_latency(const float* data, int length, int num_steps, float* out_spikes);
+SPKG_API int spkg_encode_delta(const float* data, int length, int num_steps, float* out_spikes, float threshold);
+
+#ifdef __cplusplus
+}
+#endif
 #pragma once
 
 #ifdef _WIN32
@@ -20,10 +59,16 @@ typedef void* SNNHandle;
 
 typedef void (*SpikeCallback)(int neuron_id, double time, void* user_data);
 
-// Configuration placeholder
+
+enum NeuronModelType {
+  LIF = 0,
+  Izhikevich = 1,
+};
+
 struct SNNConfig {
-    int num_neurons;
-    double dt;
+  int num_neurons;
+  double dt;
+  int neuron_model; // 0 = LIF, 1 = Izhikevich
 };
 
 SPKG_API SNNHandle snn_create_network(const SNNConfig* config);

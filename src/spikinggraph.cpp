@@ -1,20 +1,43 @@
+#include <queue>
+#include <tuple>
+struct Event {
+    double time;
+    int neuron_id;
+    float weight;
+    bool operator<(const Event& other) const {
+        // Reverse for min-heap
+        return time > other.time;
+    }
+};
 #include "spikinggraph.h"
 #include <vector>
 #include <cstring>
 #include <mutex>
 
+enum NeuronModelType {
+    LIF = 0,
+    Izhikevich = 1,
+};
+
 struct SNNContext {
     int num_neurons;
     double dt;
+    int neuron_model; // 0 = LIF, 1 = Izhikevich
     // LIF parameters per neuron
     std::vector<float> membrane_potentials;
     std::vector<float> membrane_threshold;
     std::vector<float> membrane_reset;
     std::vector<float> membrane_tau;
+    // Izhikevich parameters/state
+    std::vector<float> izh_v, izh_u, izh_a, izh_b, izh_c, izh_d;
     // synaptic weights (sparse adjacency list)
     std::vector<std::vector<std::pair<int,float>>> connections;
     // event-driven input queue (per-neuron accumulated current)
     std::vector<float> input_current;
+    // Event-driven
+    std::priority_queue<Event> event_queue;
+    double sim_time = 0.0;
+    double synaptic_delay = 1.0; // ms, fixed for now
 
     SpikeCallback callback;
     void* user_data;
@@ -28,10 +51,20 @@ SNNHandle snn_create_network(const SNNConfig* config) {
     SNNContext* ctx = new SNNContext();
     ctx->num_neurons = config->num_neurons;
     ctx->dt = config->dt;
+    ctx->neuron_model = (config->neuron_model == 1) ? Izhikevich : LIF;
+    // LIF
     ctx->membrane_potentials.assign(ctx->num_neurons, 0.0f);
     ctx->membrane_threshold.assign(ctx->num_neurons, 1.0f);
     ctx->membrane_reset.assign(ctx->num_neurons, 0.0f);
     ctx->membrane_tau.assign(ctx->num_neurons, 10.0f);
+    // Izhikevich
+    ctx->izh_v.assign(ctx->num_neurons, -65.0f);
+    ctx->izh_u.assign(ctx->num_neurons, 0.0f);
+    ctx->izh_a.assign(ctx->num_neurons, 0.02f);
+    ctx->izh_b.assign(ctx->num_neurons, 0.2f);
+    ctx->izh_c.assign(ctx->num_neurons, -65.0f);
+    ctx->izh_d.assign(ctx->num_neurons, 8.0f);
+    // Common
     ctx->connections.resize(ctx->num_neurons);
     ctx->input_current.assign(ctx->num_neurons, 0.0f);
     ctx->callback = nullptr;
@@ -48,31 +81,62 @@ int snn_run_step(SNNHandle snn, double dt) {
     if (!snn) return -1;
     SNNContext* ctx = static_cast<SNNContext*>(snn);
     std::lock_guard<std::mutex> lock(ctx->mtx);
-    // LIF dynamics (Euler integration) with event-driven inputs
-    for (int i = 0; i < ctx->num_neurons; ++i) {
-        float I = ctx->input_current[i];
-        float V = ctx->membrane_potentials[i];
-        float tau = ctx->membrane_tau[i];
-        // dV/dt = -V/tau + I
-        float dV = (-V / tau + I) * static_cast<float>(dt);
-        V += dV;
-        ctx->membrane_potentials[i] = V;
-        // reset input after consumed
-        ctx->input_current[i] = 0.0f;
-        if (V >= ctx->membrane_threshold[i]) {
-            // spike
-            ctx->membrane_potentials[i] = ctx->membrane_reset[i];
-            if (ctx->callback) ctx->callback(i, 0.0, ctx->user_data);
-            // propagate to targets
-            for (auto &pr : ctx->connections[i]) {
-                int dst = pr.first;
-                float w = pr.second;
-                if (dst >= 0 && dst < ctx->num_neurons) {
-                    ctx->input_current[dst] += w;
+    double end_time = ctx->sim_time + dt;
+    // Process all events up to end_time
+    while (!ctx->event_queue.empty() && ctx->event_queue.top().time <= end_time) {
+        Event ev = ctx->event_queue.top(); ctx->event_queue.pop();
+        ctx->sim_time = ev.time;
+        int i = ev.neuron_id;
+        ctx->input_current[i] += ev.weight;
+        if (ctx->neuron_model == LIF) {
+            float V = ctx->membrane_potentials[i];
+            float tau = ctx->membrane_tau[i];
+            float I = ctx->input_current[i];
+            float dV = (-V / tau + I); // treat event as impulse
+            float Vn = V + dV + I;
+            ctx->input_current[i] = 0.0f;
+            if (Vn >= ctx->membrane_threshold[i]) {
+                Vn = ctx->membrane_reset[i];
+                if (ctx->callback) ctx->callback(i, ctx->sim_time, ctx->user_data);
+                for (auto &pr : ctx->connections[i]) {
+                    int dst = pr.first;
+                    float w = pr.second;
+                    if (dst >= 0 && dst < ctx->num_neurons) {
+                        ctx->event_queue.push(Event{ctx->sim_time + ctx->synaptic_delay, dst, w});
+                    }
                 }
             }
+            ctx->membrane_potentials[i] = Vn;
+        } else if (ctx->neuron_model == Izhikevich) {
+            float v = ctx->izh_v[i];
+            float u = ctx->izh_u[i];
+            float a = ctx->izh_a[i];
+            float b = ctx->izh_b[i];
+            float c = ctx->izh_c[i];
+            float d = ctx->izh_d[i];
+            float I = ctx->input_current[i];
+            float dv = (0.04f * v * v + 5.0f * v + 140.0f - u + I);
+            float du = (a * (b * v - u));
+            float vn = v + dv;
+            float un = u + du;
+            ctx->input_current[i] = 0.0f;
+            if (vn >= 30.0f) {
+                vn = c;
+                un += d;
+                if (ctx->callback) ctx->callback(i, ctx->sim_time, ctx->user_data);
+                for (auto &pr : ctx->connections[i]) {
+                    int dst = pr.first;
+                    float w = pr.second;
+                    if (dst >= 0 && dst < ctx->num_neurons) {
+                        ctx->event_queue.push(Event{ctx->sim_time + ctx->synaptic_delay, dst, w});
+                    }
+                }
+            }
+            ctx->izh_v[i] = vn;
+            ctx->izh_u[i] = un;
         }
     }
+    ctx->sim_time = end_time;
     return 0;
 }
 
